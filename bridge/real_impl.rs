@@ -171,6 +171,118 @@ impl WebNativeBridge for RealServoBridge {
         (self.width, self.height)
     }
 
+    // ── 网络请求（需要 network feature） ──
+
+    #[cfg(feature = "network")]
+    fn navigate(&mut self, url: &str) -> Result<(), String> {
+        let response = reqwest::blocking::get(url)
+            .map_err(|e| format!("Network error: {}", e))?;
+        
+        let body = response.bytes()
+            .map_err(|e| format!("Body error: {}", e))?;
+        
+        let html = String::from_utf8_lossy(&body).to_string();
+        self.set_html(&html);
+        
+        Ok(())
+    }
+
+    #[cfg(not(feature = "network"))]
+    fn navigate(&mut self, _url: &str) -> Result<(), String> {
+        Err("Network feature not enabled".to_string())
+    }
+
+    #[cfg(feature = "network")]
+    fn current_url(&self) -> String {
+        String::new()
+    }
+
+    #[cfg(not(feature = "network"))]
+    fn current_url(&self) -> String {
+        String::new()
+    }
+
+    #[cfg(feature = "network")]
+    fn http_get(&mut self, url: &str) -> Result<crate::network::HttpResponse, String> {
+        let response = reqwest::blocking::get(url)
+            .map_err(|e| format!("HTTP GET error: {}", e))?;
+        
+        let status = response.status().as_u16();
+        let headers: HashMap<String, String> = response.headers()
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+            .collect();
+        let body = response.bytes()
+            .map_err(|e| format!("Body error: {}", e))?
+            .to_vec();
+        
+        Ok(crate::network::HttpResponse {
+            status,
+            headers,
+            body,
+            url: url.to_string(),
+        })
+    }
+
+    #[cfg(not(feature = "network"))]
+    fn http_get(&mut self, _url: &str) -> Result<crate::network::HttpResponse, String> {
+        Err("Network feature not enabled".to_string())
+    }
+
+    #[cfg(feature = "network")]
+    fn http_post(&mut self, url: &str, body: &[u8], content_type: &str) -> Result<crate::network::HttpResponse, String> {
+        let client = reqwest::blocking::Client::new();
+        
+        let response = client
+            .post(url)
+            .header("Content-Type", content_type)
+            .body(body.to_vec())
+            .send()
+            .map_err(|e| format!("HTTP POST error: {}", e))?;
+        
+        let status = response.status().as_u16();
+        let headers: HashMap<String, String> = response.headers()
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+            .collect();
+        let resp_body = response.bytes()
+            .map_err(|e| format!("Body error: {}", e))?
+            .to_vec();
+        
+        Ok(crate::network::HttpResponse {
+            status,
+            headers,
+            body: resp_body,
+            url: url.to_string(),
+        })
+    }
+
+    #[cfg(not(feature = "network"))]
+    fn http_post(&mut self, _url: &str, _body: &[u8], _content_type: &str) -> Result<crate::network::HttpResponse, String> {
+        Err("Network feature not enabled".to_string())
+    }
+
+    #[cfg(feature = "network")]
+    fn download_file(&mut self, url: &str, path: &str) -> Result<u64, String> {
+        let response = reqwest::blocking::get(url)
+            .map_err(|e| format!("Download error: {}", e))?;
+        
+        let body = response.bytes()
+            .map_err(|e| format!("Body error: {}", e))?;
+        
+        std::fs::write(path, &body)
+            .map_err(|e| format!("Write error: {}", e))?;
+        
+        Ok(body.len() as u64)
+    }
+
+    #[cfg(not(feature = "network"))]
+    fn download_file(&mut self, _url: &str, _path: &str) -> Result<u64, String> {
+        Err("Network feature not enabled".to_string())
+    }
+
+    // ── 文件操作 ──
+
     fn write_file(&mut self, path: &str, data: &[u8]) -> Result<(), String> {
         std::fs::write(path, data)
             .map_err(|e| format!("Write error: {}", e))

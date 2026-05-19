@@ -4,9 +4,9 @@
 //! 不依赖 SpiderMonkey，使用独立的 HTML/CSS 解析和布局引擎。
 
 pub mod bridge;
-pub mod servo_impl;
+pub mod network;
 pub mod real_impl;
 
 pub use bridge::*;
-pub use servo_impl::ServoBridge;
+pub use network::*;
 pub use real_impl::RealServoBridge;
