@@ -18,3 +18,8 @@ log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 url = "2.5"
+
+# 真实渲染依赖
+tiny-skia = "0.11"        # 2D 渲染
+png = "0.17"              # PNG 编码
+reqwest = { version = "0.12", features = ["blocking"] }  # HTTP 请求
