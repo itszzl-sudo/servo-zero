@@ -14,11 +14,19 @@ path = "lib.rs"
 crate-type = ["rlib"]
 
 [features]
-default = []
-# 启用 HTML 支持（需要显式开启）
+# 默认模式：完整浏览器功能
+default = ["html", "network"]
+
+# HTML 解析支持
 html = ["html-core"]
-# 启用 embed 模式：禁用 HTML 支持，仅保留布局和 CSS
-embed = []
+
+# 网络请求支持
+network = ["reqwest"]
+
+# embed 模式：嵌入其他程序使用
+# - 无 HTML 解析（减少依赖）
+# - 有 CSS 布局、渲染、事件、网络、文件操作
+embed = ["network"]
 
 [dependencies]
 log = "0.4"
@@ -28,9 +36,12 @@ url = "2.5"
 
 # 独立核心组件（无 SpiderMonkey 依赖）
 html-core = { path = "../components/html_core", optional = true }
-css-core = { path = "../components/css_core", default-features = false }
-layout-core = { path = "../components/layout_core", default-features = false }
+css-core = { path = "../components/css_core" }
+layout-core = { path = "../components/layout_core" }
 
 # 渲染依赖
 tiny-skia = "0.11"  # 2D 渲染
-png = "0.17"       # PNG 编码
+png = "0.17"        # PNG 编码
+
+# 网络请求（可选）
+reqwest = { version = "0.12", features = ["blocking"], optional = true }
