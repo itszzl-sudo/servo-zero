@@ -1,52 +1,69 @@
 # Servo-Zero
 
-A Web-Native browser engine project based on Servo, providing a bridge layer for DOM manipulation and event handling.
+A lightweight Web-Native browser rendering engine based on Servo, providing a pure Rust bridge layer for DOM manipulation, CSS layout, and event handling. **No SpiderMonkey dependency.**
 
 ## Project Overview
 
-This project implements a Web-Native bridge layer that enables:
+Servo-Zero implements a Web-Native bridge layer that enables:
 - DOM injection and manipulation through the bridge
+- CSS box model and Flexbox layout engine
 - Event listening and handling
-- Network request management
-- File operations
+- PNG image rendering
 
 ## Architecture
 
 ```
 servo-zero/
-├── bridge/              # Web-Native bridge implementation
-│   ├── bridge.rs       # WebNativeBridge trait definition
-│   ├── servo_impl.rs   # ServoBridge mock implementation
-│   └── network.rs      # HTTP response types
-├── components/         # Servo engine components
-│   ├── shared/        # Shared dependencies (base, config, constellation, etc.)
-│   ├── servo/         # Main servo component
-│   ├── geometry/      # Geometry utilities
-│   ├── layout/        # Layout engine
-│   ├── paint/         # Rendering layer
-│   └── script/        # Script engine
-└── Cargo.toml         # Workspace configuration
+├── Cargo.toml              # Workspace configuration
+├── bridge/                 # Web-Native bridge implementation
+│   ├── lib.rs            # Library entry point & exports
+│   ├── bridge.rs         # WebNativeBridge trait definition
+│   ├── servo_impl.rs     # ServoBridge implementation
+│   ├── real_impl.rs      # Production bridge implementation
+│   └── network.rs        # HTTP response types
+└── components/            # Core engine components
+    ├── html_core/        # HTML parsing & DOM
+    ├── css_core/        # CSS parsing, cascade & matching
+    └── layout_core/     # CSS box model & Flexbox layout
 ```
 
-## JavaScript Files in Project
+## Features
 
-Although this is a Web-Native project that does not use JavaScript, the following JS files are included as part of the Servo engine's media control functionality:
+### Dual Mode Support
 
-1. `components/shared/script/resources/media-controls.js` - HTML5 media player controls
-2. `components/script/resources/media-controls.js` - HTML5 media player controls (duplicate)
+| Mode | Features | Use Case |
+|------|----------|----------|
+| **Full** (`html`) | HTML parsing, DOM, CSS, Layout, Rendering | Full browser engine |
+| **Embed** | CSS, Layout, Rendering (no HTML) | Embedded UI rendering |
 
-These files are part of the Servo engine's built-in media control system for HTML5 `<video>` and `<audio>` elements.
+### Core Components
+
+- **html_core**: Pure Rust HTML5 parser with DOM tree support
+- **css_core**: CSS 2.1/3 parser with selector matching and cascade
+- **layout_core**: CSS box model, Flexbox layout algorithm, and pixel rendering
 
 ## Building
 
 ```bash
-# Build the bridge crate
-cd bridge
+# Build with HTML support (full mode)
+cargo build --features html
+
+# Build in embed mode (no HTML, smaller binary)
+cargo build --no-default-features --features embed
+
+# Build default configuration
 cargo build
 
 # Run tests
 cargo test
 ```
+
+### Feature Flags
+
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `html` | Off | Enable HTML parsing and DOM support |
+| `embed` | Off | Embed mode: no HTML, minimal binary size |
 
 ## Usage Example
 
@@ -54,6 +71,7 @@ cargo test
 use servo_bridge::ServoBridge;
 use servo_bridge::WebNativeBridge;
 
+// Create bridge
 let mut bridge = ServoBridge::new(1280, 720);
 
 // Set HTML content
@@ -70,13 +88,26 @@ bridge.on_click("#btn", Box::new(|x, y| {
 // Handle clicks
 bridge.handle_click(100.0, 200.0);
 
-// Render
+// Render to PNG
 let png_data = bridge.render();
 ```
 
+## Dependencies
+
+### Runtime
+- `tiny-skia` - 2D rendering
+- `png` - PNG encoding
+- `log` - Logging
+- `serde` - Serialization
+
+### Core (embedded)
+- `html5ever` - HTML parsing (optional, with `html` feature)
+- `cssparser` - CSS parsing (optional, with `html` feature)
+- `selectors` - CSS selector matching (optional, with `html` feature)
+
 ## Acknowledgments
 
-This project was developed with assistance from **Trae**.
+This project was developed with assistance from **CodeBuddy** and **Trae**.
 
 Special thanks to the Servo project team for providing the browser engine foundation.
 

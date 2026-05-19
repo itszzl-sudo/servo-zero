@@ -1,0 +1,20 @@
+[package]
+name = "html-core"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "HTML parsing and DOM building without SpiderMonkey"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+# 日志
+log = { workspace = true }
+
+[features]
+default = []

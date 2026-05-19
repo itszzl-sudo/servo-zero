@@ -123,30 +123,53 @@ pub trait WebNativeBridge {
     // ── DOM 读写 ──
 
     /// 设置页面 HTML
-    fn set_html(&mut self, html: &str);
+    #[inline]
+    fn set_html(&mut self, _html: &str) {
+        log::warn!("set_html called but HTML support is not enabled (embed mode)");
+    }
 
     /// 按 CSS 选择器查找第一个元素，返回 DOM 节点 ID
-    fn query(&self, selector: &str) -> Option<usize>;
+    #[inline]
+    fn query(&self, _selector: &str) -> Option<usize> {
+        None
+    }
 
     /// 按 CSS 选择器查找所有匹配元素
-    fn query_all(&self, selector: &str) -> Vec<usize>;
+    #[inline]
+    fn query_all(&self, _selector: &str) -> Vec<usize> {
+        Vec::new()
+    }
 
     /// 获取元素标签名
-    fn tag_name(&self, node_id: usize) -> Option<String>;
+    #[inline]
+    fn tag_name(&self, _node_id: usize) -> Option<String> {
+        None
+    }
 
     /// 获取元素属性
-    fn get_attr(&self, node_id: usize, name: &str) -> Option<String>;
+    #[inline]
+    fn get_attr(&self, _node_id: usize, _name: &str) -> Option<String> {
+        None
+    }
 
     /// 设置元素属性
-    fn set_attr(&mut self, node_id: usize, name: &str, value: &str);
+    #[inline]
+    fn set_attr(&mut self, _node_id: usize, _name: &str, _value: &str) {}
 
     /// 获取元素文本内容
-    fn text(&self, node_id: usize) -> Option<String>;
+    #[inline]
+    fn text(&self, _node_id: usize) -> Option<String> {
+        None
+    }
 
     /// 获取父节点 ID
-    fn parent_node(&self, node_id: usize) -> Option<usize>;
+    #[inline]
+    fn parent_node(&self, _node_id: usize) -> Option<usize> {
+        None
+    }
 
     /// 按选择器获取元素文本
+    #[inline]
     fn query_text(&self, selector: &str) -> Option<String> {
         let id = self.query(selector)?;
         self.text(id)
@@ -212,29 +235,7 @@ pub trait WebNativeBridge {
     /// 获取视口尺寸
     fn viewport(&self) -> (u32, u32);
 
-    // ── 网络请求 ──
-
-    /// 导航到 URL
-    fn navigate(&mut self, url: &str) -> Result<(), String>;
-
-    /// 获取当前 URL
-    fn current_url(&self) -> String;
-
-    /// 发送 HTTP GET 请求
-    fn http_get(&mut self, url: &str) -> Result<crate::network::HttpResponse, String>;
-
-    /// 发送 HTTP POST 请求
-    fn http_post(
-        &mut self,
-        url: &str,
-        body: &[u8],
-        content_type: &str,
-    ) -> Result<crate::network::HttpResponse, String>;
-
     // ── 文件操作 ──
-
-    /// 下载文件并保存到本地
-    fn download_file(&mut self, url: &str, path: &str) -> Result<u64, String>;
 
     /// 写入文件
     fn write_file(&mut self, path: &str, data: &[u8]) -> Result<(), String>;
