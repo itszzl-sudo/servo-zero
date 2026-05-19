@@ -1,0 +1,46 @@
+[package]
+name = "servo"
+version = "0.2.0"
+authors = ["The Servo Project Developers"]
+license = "MPL-2.0"
+edition = "2024"
+publish = false
+rust-version = "1.88.0"
+repository = "https://github.com/servo/servo"
+description = "Servo, the embeddable web browser engine"
+
+[lib]
+name = "servo"
+path = "lib.rs"
+crate-type = ["rlib"]
+
+[features]
+default = []
+
+[dependencies]
+accesskit = { version = "0.24.0", features = ["serde"] }
+bitflags = "2.11"
+cookie = { version = "0.18" }
+crossbeam-channel = "0.5"
+dpi = "0.1"
+embedder_traits = { path = "../shared/embedder" }
+env_logger = "0.11"
+euclid = "0.22"
+image = "0.25"
+keyboard-types = "0.12"
+log = "0.4"
+paint = { path = "../paint" }
+servo-base = { path = "../shared/base" }
+servo-config = { path = "../shared/config" }
+servo-constellation = { path = "../shared/constellation" }
+servo-constellation-traits = { path = "../shared/constellation/traits" }
+servo-geometry = { path = "../geometry" }
+servo-url = { path = "../shared/url" }
+script = { path = "../script" }
+script_traits = { path = "../shared/script/traits" }
+serde = { version = "1.0", features = ["derive"] }
+surfman = "0.9"
+tokio = { version = "1.0", features = ["sync"] }
+url = "2.5"
+webrender = "0.67"
+webrender_api = "0.67"

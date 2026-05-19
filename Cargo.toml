@@ -1,0 +1,14 @@
+[workspace]
+members = [
+    "bridge",
+]
+
+[workspace.package]
+version = "0.1.0"
+authors = ["Servo Developers"]
+license = "MPL-2.0"
+edition = "2021"
+publish = false
+rust-version = "1.70"
+repository = "https://github.com/servo/servo"
+description = "Servo bridge workspace"
