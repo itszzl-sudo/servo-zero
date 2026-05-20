@@ -29,6 +29,10 @@ path = "verify_render.rs"
 name = "irisverse_native_render"
 path = "irisverse_native_render.rs"
 
+[[bin]]
+name = "font_test"
+path = "font_test.rs"
+
 [features]
 # 默认模式：完整浏览器功能
 default = ["network", "html"]

@@ -5,13 +5,16 @@
 use std::collections::HashMap;
 use taffy::prelude::*;
 use taffy::{Overflow, Point};
-use html_core::dom::{HtmlDocument, NodeId as DomNodeId};
+use html_core::dom::{HtmlDocument, NodeId as DomNodeId, DomNodeType};
 use css_core::cascade::{ComputedStyle, StyleResolver};
 use css_core::stylesheet::Stylesheet;
 use css_core::Length as CssLength;
 use crate::box_model::{LayoutBox, LayoutNode, LayoutRect, DisplayType, PositionType};
 
 type BoxMap = HashMap<DomNodeId, LayoutBox>;
+
+/// 字体测量函数类型
+pub type FontMeasureFunc = fn(text: &str, font_size: f32, max_width: f32) -> (f32, f32);
 
 /// 布局树
 pub struct LayoutTree {
@@ -20,6 +23,7 @@ pub struct LayoutTree {
     boxes: BoxMap,
     viewport_width: f32,
     viewport_height: f32,
+    font_measure: Option<FontMeasureFunc>,
 }
 
 impl LayoutTree {
@@ -30,6 +34,7 @@ impl LayoutTree {
             boxes: HashMap::new(),
             viewport_width: 800.0,
             viewport_height: 600.0,
+            font_measure: None,
         }
     }
 

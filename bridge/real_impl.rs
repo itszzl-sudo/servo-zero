@@ -542,6 +542,20 @@ impl WebNativeBridge for RealServoBridge {
         
                         // 从 CSS font-size 属性获取字体大小，默认 14px
                         let font_size = parent_box.node.font_size.unwrap_or(14.0);
+                        
+                        // 计算文本高度（根据行数）
+                        let line_height = font_size * 1.3;
+                        let text_height = if rect.width > 0.0 {
+                            let font = match get_default_font() {
+                                Some(f) => f,
+                                None => continue,
+                            };
+                            let text_width = self.measure_text_width(font, &text, font_size);
+                            let lines = ((text_width / rect.width).ceil() as usize).max(1);
+                            lines as f32 * line_height
+                        } else {
+                            line_height
+                        };
         
                         // 计算 padding 偏移
                         let pad_left = parent_box.padding_box.x - parent_box.border_box.x
@@ -551,13 +565,31 @@ impl WebNativeBridge for RealServoBridge {
         
                         let container_x = rect.x + pad_left;
                         let container_w = rect.width - pad_left * 2.0;
+                        
+                        // 修正容器宽度（如果为0则使用文本宽度）
+                        let container_w = if container_w > 0.0 {
+                            container_w
+                        } else {
+                            let font = match get_default_font() {
+                                Some(f) => f,
+                                None => continue,
+                            };
+                            self.measure_text_width(font, &text, font_size) + 20.0
+                        };
+                        
+                        // 文本 Y 坐标：考虑修正后的高度
+                        let text_y = if rect.height < text_height {
+                            rect.y + pad_top + font_size + 2.0
+                        } else {
+                            rect.y + pad_top + font_size + 2.0
+                        };
         
                         // 文本换行渲染
                         self.render_text_wrapped(
                             &mut pixmap,
                             &text,
                             container_x,
-                            rect.y + pad_top + font_size + 2.0,
+                            text_y,
                             container_w.max(0.0),
                             font_size,
                             parent_box.node.color.unwrap_or((0, 0, 0, 255)),
