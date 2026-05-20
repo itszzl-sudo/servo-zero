@@ -6,7 +6,9 @@
 pub mod bridge;
 pub mod network;
 pub mod real_impl;
+pub mod servo_impl;
 
 pub use bridge::*;
 pub use network::*;
 pub use real_impl::RealServoBridge;
+pub use servo_impl::ServoBridge;

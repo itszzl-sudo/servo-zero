@@ -13,35 +13,47 @@ name = "servo_bridge"
 path = "lib.rs"
 crate-type = ["rlib"]
 
+[[bin]]
+name = "test_render"
+path = "test_render_main.rs"
+
+[[bin]]
+name = "css_advanced_test"
+path = "css_advanced_test.rs"
+
+[[bin]]
+name = "verify_render"
+path = "verify_render.rs"
+
 [features]
 # 默认模式：完整浏览器功能
-default = ["html", "network"]
+default = ["network", "html"]
 
 # HTML 解析支持
-html = ["html-core"]
+html = []
 
 # 网络请求支持
 network = ["reqwest"]
 
 # embed 模式：嵌入其他程序使用
-# - 无 HTML 解析（减少依赖）
-# - 有 CSS 布局、渲染、事件、网络、文件操作
-embed = ["network"]
+embed = ["network", "html"]
 
 [dependencies]
 log = "0.4"
+env_logger = "0.11"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 url = "2.5"
 
 # 独立核心组件（无 SpiderMonkey 依赖）
-html-core = { path = "../components/html_core", optional = true }
+html-core = { path = "../components/html_core" }
 css-core = { path = "../components/css_core" }
 layout-core = { path = "../components/layout_core" }
 
 # 渲染依赖
 tiny-skia = "0.11"  # 2D 渲染
 png = "0.17"        # PNG 编码
+fontdue = "0.9"     # 字体渲染
 
 # 网络请求（可选）
 reqwest = { version = "0.12", features = ["blocking"], optional = true }

@@ -19,6 +19,7 @@ euclid = { workspace = true }
 log = { workspace = true }
 rayon = { workspace = true }
 rustc-hash = { workspace = true }
+taffy = { workspace = true }
 
 [features]
 default = []

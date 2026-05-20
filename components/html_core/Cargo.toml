@@ -15,6 +15,9 @@ path = "lib.rs"
 [dependencies]
 # 日志
 log = { workspace = true }
+# HTML 解析
+html5ever = { workspace = true }
+markup5ever_rcdom = { workspace = true }
 
 [features]
 default = []

@@ -1,6 +1,10 @@
-//! HTML 解析器实现
+//! HTML 解析器 —— 基于 html5ever（与 Servo 相同的库）
 
-use crate::dom::{HtmlDocument, DomNode, NodeId};
+use html5ever::parse_document;
+use html5ever::tendril::TendrilSink;
+use markup5ever_rcdom::{Handle, NodeData, RcDom};
+
+use crate::dom::{DomNode, HtmlDocument, NodeId};
 
 /// HTML 解析器
 pub struct HtmlParser {
@@ -8,145 +12,143 @@ pub struct HtmlParser {
 }
 
 impl HtmlParser {
-    /// 创建新的解析器
     pub fn new() -> Self {
         Self {
             document: HtmlDocument::new(),
         }
     }
 
-    /// 解析 HTML 字符串
+    /// 解析 HTML 字符串，返回构建好的文档引用
     pub fn parse(&mut self, html: &str) -> &HtmlDocument {
-        self.parse_html(html, None);
+        // 用 html5ever 解析到 RcDom
+        let rc_dom = parse_document(RcDom::default(), Default::default())
+            .from_utf8()
+            .read_from(&mut html.as_bytes())
+            .unwrap_or_else(|_| RcDom::default());
+
+        // 重新初始化文档
+        self.document = HtmlDocument::new();
+
+        // 从 RcDom 转换到我们的 HtmlDocument
+        let rc_root = rc_dom.document.clone();
+        let our_root_id = self.document.root_id().unwrap_or(0);
+        self.convert_node(&rc_root, our_root_id, &rc_dom);
+
+        log::info!(
+            "html5ever 解析完成，共 {} 个节点",
+            self.document.nodes_len()
+        );
+
         &self.document
     }
 
-    /// 递归解析 HTML
-    fn parse_html(&mut self, html: &str, parent_id: Option<NodeId>) {
-        let mut remaining = html.trim();
-        let root_id = parent_id.unwrap_or(self.document.root_id().unwrap_or(0));
-        
-        while !remaining.is_empty() {
-            remaining = remaining.trim_start();
-            if remaining.is_empty() {
-                break;
-            }
-            
-            // 跳过注释
-            if remaining.starts_with("<!--") {
-                if let Some(end) = remaining.find("-->") {
-                    let comment = &remaining[4..end];
-                    let mut node = DomNode::new_comment(self.document.next_id(), comment.to_string());
-                    node.parent = parent_id;
-                    let idx = self.document.add_node(node);
-                    if let Some(p) = self.document.get_node_mut(root_id) {
-                        p.children.push(idx);
-                    }
-                    remaining = &remaining[end + 3..];
-                    continue;
-                }
-            }
-            
-            // 处理文本节点
-            if !remaining.starts_with('<') {
-                if let Some(end) = remaining.find('<') {
-                    let text = &remaining[..end];
-                    if !text.trim().is_empty() {
-                        let mut node = DomNode::new_text(self.document.next_id(), text.to_string());
-                        node.parent = parent_id;
-                        let idx = self.document.add_node(node);
-                        if let Some(p) = self.document.get_node_mut(root_id) {
-                            p.children.push(idx);
-                        }
-                    }
-                    remaining = &remaining[end..];
-                    continue;
-                }
-            }
-            
-            // 处理标签
-            if remaining.starts_with('<') {
-                if let Some(end_tag) = remaining.find('>') {
-                    let tag_content = &remaining[1..end_tag];
-                    
-                    // 跳过 DOCTYPE 和其他特殊标签
-                    if tag_content.starts_with('!') || tag_content.starts_with("?") {
-                        remaining = &remaining[end_tag + 1..];
-                        continue;
-                    }
-                    
-                    // 检查是否是闭合标签
-                    if tag_content.starts_with('/') {
-                        return;
-                    }
-                    
-                    // 解析标签名和属性
-                    let parts: Vec<&str> = tag_content.split_whitespace().collect();
-                    if !parts.is_empty() {
-                        let tag_name = parts[0].to_lowercase();
-                        let mut attrs = std::collections::HashMap::new();
-                        
-                        for attr_part in parts.iter().skip(1) {
-                            let attr = attr_part.trim_end_matches('/');
-                            if let Some((k, v)) = attr.split_once('=') {
-                                let value = v.trim_matches('"').trim_matches('\'');
-                                attrs.insert(k.to_string(), value.to_string());
-                            }
-                        }
-                        
-                        // 创建节点
-                        let mut node = DomNode::new_element(self.document.next_id(), tag_name.clone());
-                        node.attributes = attrs;
-                        node.parent = parent_id;
-                        
-                        let idx = self.document.add_node(node);
-                        
-                        // 自闭合标签
-                        let self_closing = tag_content.ends_with('/') 
-                            || ["img", "br", "hr", "input", "meta", "link", "area", "base", "col", "embed", "param", "source", "track", "wbr"].contains(&tag_name.as_str());
-                        
-                        if !self_closing {
-                            remaining = &remaining[end_tag + 1..];
-                            
-                            let close_tag = format!("</{}>", tag_name);
-                            
-                            if let Some(close_pos) = remaining.find(&close_tag) {
-                                let child_content = &remaining[..close_pos];
-                                self.parse_html(child_content, Some(idx));
-                                remaining = &remaining[close_pos + close_tag.len()..];
-                            }
-                        } else {
-                            remaining = &remaining[end_tag + 1..];
-                        }
-                        
-                        if let Some(p) = self.document.get_node_mut(root_id) {
-                            p.children.push(idx);
-                        }
-                    } else {
-                        remaining = &remaining[end_tag + 1..];
-                    }
-                } else {
-                    break;
-                }
-            } else {
-                remaining = &remaining[1..];
-            }
-        }
-    }
-
-    /// 获取解析后的文档
     pub fn document(&self) -> &HtmlDocument {
         &self.document
     }
 
-    /// 获取可变文档引用
     pub fn document_mut(&mut self) -> &mut HtmlDocument {
         &mut self.document
+    }
+
+    /// 递归将 RcDom 节点转换为我们的 HtmlDocument 节点
+    fn convert_node(&mut self, rc_node: &Handle, parent_id: NodeId, dom: &RcDom) {
+        match &rc_node.data {
+            NodeData::Document => {
+                // 文档根节点已经在 HtmlDocument::new() 里创建了
+                for child in rc_node.children.borrow().iter() {
+                    self.convert_node(child, parent_id, dom);
+                }
+            }
+
+            NodeData::Element { name, attrs, .. } => {
+                let tag = name.local.as_ref().to_lowercase();
+
+                // 跳过 head / script / style 的内容（不渲染）
+                // 但保留 style 标签本身（用于提取 CSS）
+                let mut node = DomNode::new_element(0, tag.clone());
+
+                // 拷贝属性
+                for attr in attrs.borrow().iter() {
+                    let attr_name = attr.name.local.as_ref().to_lowercase();
+                    let attr_value = attr.value.as_ref().to_string();
+                    node.set_attr(attr_name, attr_value);
+                }
+
+                let node_id = self.document.add_node(node);
+
+                // 建立父子关系
+                self.document.append_child(parent_id, node_id);
+
+                // 递归子节点
+                for child in rc_node.children.borrow().iter() {
+                    self.convert_node(child, node_id, dom);
+                }
+            }
+
+            NodeData::Text { contents } => {
+                let text = contents.borrow().as_ref().to_string();
+                if !text.trim().is_empty() {
+                    let node = DomNode::new_text(0, text);
+                    let node_id = self.document.add_node(node);
+                    self.document.append_child(parent_id, node_id);
+                }
+            }
+
+            NodeData::Comment { .. } => {
+                // 忽略注释
+            }
+
+            NodeData::Doctype { .. } => {
+                // 忽略 DOCTYPE
+            }
+
+            NodeData::ProcessingInstruction { .. } => {
+                // 忽略处理指令
+            }
+        }
     }
 }
 
 impl Default for HtmlParser {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// 从 HTML 字符串中提取所有 <style> 标签的内容
+pub fn extract_style_tags(html: &str) -> Vec<String> {
+    let mut styles = Vec::new();
+    let rc_dom = parse_document(RcDom::default(), Default::default())
+        .from_utf8()
+        .read_from(&mut html.as_bytes())
+        .unwrap_or_else(|_| RcDom::default());
+
+    collect_style_contents(&rc_dom.document, &mut styles);
+    styles
+}
+
+fn collect_style_contents(node: &Handle, styles: &mut Vec<String>) {
+    match &node.data {
+        NodeData::Element { name, .. } => {
+            let tag = name.local.as_ref().to_lowercase();
+            if tag == "style" {
+                // 收集 style 标签内的文本内容
+                let mut css = String::new();
+                for child in node.children.borrow().iter() {
+                    if let NodeData::Text { contents } = &child.data {
+                        css.push_str(contents.borrow().as_ref());
+                    }
+                }
+                if !css.trim().is_empty() {
+                    styles.push(css);
+                }
+                return; // style 标签的子节点不需要继续递归
+            }
+        }
+        _ => {}
+    }
+    // 递归子节点
+    for child in node.children.borrow().iter() {
+        collect_style_contents(child, styles);
     }
 }
