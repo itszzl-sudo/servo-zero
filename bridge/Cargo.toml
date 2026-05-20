@@ -25,6 +25,10 @@ path = "css_advanced_test.rs"
 name = "verify_render"
 path = "verify_render.rs"
 
+[[bin]]
+name = "irisverse_native_render"
+path = "irisverse_native_render.rs"
+
 [features]
 # 默认模式：完整浏览器功能
 default = ["network", "html"]
