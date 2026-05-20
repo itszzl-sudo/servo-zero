@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 use layout_core::LayoutTree;
 use crate::bridge::*;
+use crate::real_impl::render_text;
 
 /// Mock 实现 - 用于测试和参考
 pub struct ServoBridge {
@@ -46,6 +47,111 @@ impl ServoBridge {
     #[cfg(feature = "html")]
     pub fn html_document(&self) -> &html_core::dom::HtmlDocument {
         self.layout_tree.document()
+    }
+
+    /// 实现真正的页面渲染（返回 PNG 字节）
+    fn do_render(&mut self) -> Vec<u8> {
+        let mut pixmap = tiny_skia::Pixmap::new(self.width, self.height)
+            .unwrap_or_else(|| tiny_skia::Pixmap::new(800, 600).unwrap());
+
+        // 白色背景
+        pixmap.fill(tiny_skia::Color::WHITE);
+
+        // 收集所有需要渲染的节点
+        let mut nodes: Vec<_> = self.layout_tree.all_rects().into_iter().collect();
+
+        // 尺寸大的先渲染（父元素）
+        nodes.sort_by(|a, b| {
+            let area_a = a.2.width * a.2.height;
+            let area_b = b.2.width * b.2.height;
+            area_b.partial_cmp(&area_a).unwrap()
+        });
+
+        let mut paint = tiny_skia::Paint::default();
+        for (id, tag, rect, bg) in &nodes {
+            let color = match bg {
+                Some(c) => *c,
+                None => {
+                    // 即使没有背景色，也可能有 border
+                    if let Some(box_info) = self.layout_tree.get_box(*id) {
+                        if let (Some(bw), Some(bc)) = (box_info.node.border_width, box_info.node.border_color) {
+                            if bw > 0.0 {
+                                let stroke = tiny_skia::Stroke { width: bw, ..Default::default() };
+                                let mut border_paint = tiny_skia::Paint::default();
+                                border_paint.set_color_rgba8(bc.0, bc.1, bc.2, bc.3);
+                                if let Some(sk_rect) = tiny_skia::Rect::from_xywh(rect.x, rect.y, rect.width, rect.height) {
+                                    let path = tiny_skia::PathBuilder::from_rect(sk_rect);
+                                    pixmap.stroke_path(&path, &border_paint, &stroke, tiny_skia::Transform::identity(), None);
+                                }
+                            }
+                        }
+                    }
+                    continue;
+                }
+            };
+
+            if rect.width <= 0.0 || rect.height <= 0.0 { continue; }
+
+            paint.set_color_rgba8(color.0, color.1, color.2, color.3);
+            if let Some(sk_rect) = tiny_skia::Rect::from_xywh(rect.x, rect.y, rect.width, rect.height) {
+                let path = tiny_skia::PathBuilder::from_rect(sk_rect);
+                pixmap.fill_path(&path, &paint, tiny_skia::FillRule::Winding,
+                    tiny_skia::Transform::identity(), None);
+
+                // 画 border
+                if let Some(box_info) = self.layout_tree.get_box(*id) {
+                    if let (Some(bw), Some(bc)) = (box_info.node.border_width, box_info.node.border_color) {
+                        if bw > 0.0 {
+                            let stroke = tiny_skia::Stroke { width: bw, ..Default::default() };
+                            let mut border_paint = tiny_skia::Paint::default();
+                            border_paint.set_color_rgba8(bc.0, bc.1, bc.2, bc.3);
+                            pixmap.stroke_path(&path, &border_paint, &stroke, tiny_skia::Transform::identity(), None);
+                        }
+                    }
+                }
+            }
+            let _ = tag; // 消除未用变量警告
+        }
+
+        // 渲染文本节点
+        if let Some(root_id) = self.layout_tree.document().root_id() {
+            let mut stack = vec![root_id];
+            let mut text_nodes = Vec::new();
+
+            while let Some(node_id) = stack.pop() {
+                if let Some(node) = self.layout_tree.document().get_node(node_id) {
+                    stack.extend(node.children.iter().rev());
+                    if node.node_type == html_core::dom::DomNodeType::Text {
+                        if let Some(ref t) = node.text_content {
+                            let trimmed = t.trim();
+                            if !trimmed.is_empty() {
+                                text_nodes.push((node_id, trimmed.to_string()));
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (node_id, text) in text_nodes {
+                if let Some(parent_id) = self.layout_tree.document().get_node(node_id).and_then(|n| n.parent) {
+                    if let Some(parent_box) = self.layout_tree.get_box(parent_id) {
+                        let rect = parent_box.content_box;
+                        let font_size = parent_box.node.font_size.unwrap_or(14.0);
+                        let text_width_est = text.chars().count() as f32 * font_size * 0.55;
+                        let text_x = match parent_box.node.text_align.as_deref() {
+                            Some("center") => (rect.x + (rect.width - text_width_est) / 2.0).max(rect.x),
+                            Some("right")  => (rect.x + rect.width - text_width_est - 4.0).max(rect.x + 4.0),
+                            _ => rect.x + 4.0,
+                        };
+                        let text_y = rect.y + font_size + 2.0;
+                        let text_color = parent_box.node.color.unwrap_or((0, 0, 0, 255));
+                        render_text(&mut pixmap, &text, text_x, text_y, font_size, text_color);
+                    }
+                }
+            }
+        }
+
+        pixmap.encode_png().unwrap_or_default()
     }
 }
 
@@ -194,22 +300,31 @@ mod html_support {
         }
         
         fn render(&mut self) -> Vec<u8> {
-            let mut pixmap = tiny_skia::Pixmap::new(self.width, self.height)
-                .unwrap_or_else(|| tiny_skia::Pixmap::new(800, 600).unwrap());
-            pixmap.fill(tiny_skia::Color::WHITE);
-            pixmap.encode_png().unwrap_or_default()
+            self.do_render()
         }
         
         fn on_click(&mut self, selector: &str, handler: EventHandler) {
             self.click_handlers.insert(selector.to_string(), handler);
         }
         
+        fn remove_on_click(&mut self, selector: &str) -> bool {
+            self.click_handlers.remove(selector).is_some()
+        }
+        
         fn on_form_submit(&mut self, selector: &str, handler: FormHandler) {
             self.form_handlers.insert(selector.to_string(), handler);
         }
         
+        fn remove_on_form_submit(&mut self, selector: &str) -> bool {
+            self.form_handlers.remove(selector).is_some()
+        }
+        
         fn on_window_open(&mut self, handler: WindowOpenHandler) {
             self.window_open_handler = Some(handler);
+        }
+        
+        fn remove_on_window_open(&mut self) -> bool {
+            self.window_open_handler.take().is_some()
         }
         
         fn handle_click(&mut self, x: f32, y: f32) -> bool {
@@ -263,6 +378,25 @@ mod html_support {
         fn read_file(&mut self, path: &str) -> Result<Vec<u8>, String> {
             std::fs::read(path)
                 .map_err(|e| format!("Read error: {}", e))
+        }
+
+        // 网络方法（mock 实现）
+        fn navigate(&mut self, _url: &str) -> Result<(), String> {
+            Err("Network not supported in ServoBridge mock".to_string())
+        }
+
+        fn current_url(&self) -> String { String::new() }
+
+        fn http_get(&mut self, _url: &str) -> Result<crate::network::HttpResponse, String> {
+            Err("Network not supported in ServoBridge mock".to_string())
+        }
+
+        fn http_post(&mut self, _url: &str, _body: &[u8], _content_type: &str) -> Result<crate::network::HttpResponse, String> {
+            Err("Network not supported in ServoBridge mock".to_string())
+        }
+
+        fn download_file(&mut self, _url: &str, _path: &str) -> Result<u64, String> {
+            Err("Network not supported in ServoBridge mock".to_string())
         }
     }
 }
@@ -346,22 +480,31 @@ mod no_html_support {
         }
         
         fn render(&mut self) -> Vec<u8> {
-            let mut pixmap = tiny_skia::Pixmap::new(self.width, self.height)
-                .unwrap_or_else(|| tiny_skia::Pixmap::new(800, 600).unwrap());
-            pixmap.fill(tiny_skia::Color::WHITE);
-            pixmap.encode_png().unwrap_or_default()
+            self.do_render()
         }
         
         fn on_click(&mut self, selector: &str, handler: EventHandler) {
             self.click_handlers.insert(selector.to_string(), handler);
         }
         
+        fn remove_on_click(&mut self, selector: &str) -> bool {
+            self.click_handlers.remove(selector).is_some()
+        }
+        
         fn on_form_submit(&mut self, selector: &str, handler: FormHandler) {
             self.form_handlers.insert(selector.to_string(), handler);
         }
         
+        fn remove_on_form_submit(&mut self, selector: &str) -> bool {
+            self.form_handlers.remove(selector).is_some()
+        }
+        
         fn on_window_open(&mut self, handler: WindowOpenHandler) {
             self.window_open_handler = Some(handler);
+        }
+        
+        fn remove_on_window_open(&mut self) -> bool {
+            self.window_open_handler.take().is_some()
         }
         
         fn handle_click(&mut self, x: f32, y: f32) -> bool {
@@ -407,6 +550,25 @@ mod no_html_support {
         fn read_file(&mut self, path: &str) -> Result<Vec<u8>, String> {
             std::fs::read(path)
                 .map_err(|e| format!("Read error: {}", e))
+        }
+
+        // 网络方法（mock 实现，不支持实际请求）
+        fn navigate(&mut self, _url: &str) -> Result<(), String> {
+            Err("Network not supported in ServoBridge mock".to_string())
+        }
+
+        fn current_url(&self) -> String { String::new() }
+
+        fn http_get(&mut self, _url: &str) -> Result<crate::network::HttpResponse, String> {
+            Err("Network not supported in ServoBridge mock".to_string())
+        }
+
+        fn http_post(&mut self, _url: &str, _body: &[u8], _content_type: &str) -> Result<crate::network::HttpResponse, String> {
+            Err("Network not supported in ServoBridge mock".to_string())
+        }
+
+        fn download_file(&mut self, _url: &str, _path: &str) -> Result<u64, String> {
+            Err("Network not supported in ServoBridge mock".to_string())
         }
     }
 }

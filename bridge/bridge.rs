@@ -212,11 +212,20 @@ pub trait WebNativeBridge {
     /// 绑定点击事件
     fn on_click(&mut self, selector: &str, handler: EventHandler);
 
+    /// 移除点击事件
+    fn remove_on_click(&mut self, selector: &str) -> bool;
+
     /// 绑定表单提交事件
     fn on_form_submit(&mut self, selector: &str, handler: FormHandler);
 
+    /// 移除表单提交事件
+    fn remove_on_form_submit(&mut self, selector: &str) -> bool;
+
     /// 绑定 window.open 事件（用于附件下载）
     fn on_window_open(&mut self, handler: WindowOpenHandler);
+
+    /// 移除 window.open 事件
+    fn remove_on_window_open(&mut self) -> bool;
 
     /// 处理鼠标点击（事件冒泡）
     fn handle_click(&mut self, x: f32, y: f32) -> bool;

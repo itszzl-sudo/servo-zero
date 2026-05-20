@@ -1,33 +1,4 @@
-[workspace]
-members = [
-    "bridge",
-    "components/html_core",
-    "components/css_core",
-    "components/layout_core",
-]
-
-[workspace.package]
-version = "0.1.0"
-authors = ["Servo Developers"]
-license = "MPL-2.0"
-edition = "2021"
-publish = false
-rust-version = "1.70"
-repository = "https://github.com/servo/servo"
-description = "Servo bridge workspace"
-
-[workspace.dependencies]
-# 日志
-log = "0.4"
-
-# 渲染/几何
-euclid = "0.22"
-tiny-skia = "0.11"
-png = "0.17"
-
-# 并行
-rayon = "1.7"
-rustc-hash = "2.0"
-
-# URL
-url = "2.5"
+# 此文件已弃用 - workspace 根目录已移至上级目录
+# servo-without-spidermonkey/Cargo.toml
+#
+# 保留此文件仅供参考，实际 workspace 由上级目录管理
